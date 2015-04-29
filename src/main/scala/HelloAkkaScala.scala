@@ -87,13 +87,11 @@ object Boot extends App {
     val merge = b.add(Merge[String](3))
     val toResponse = b.add(mapToResponse)
     
-    broadcast.out(0) ~> step1 ~> merge.in(0)
-    broadcast.out(1) ~> step2 ~> merge.in(1) 
-    broadcast.out(2) ~> step3 ~> merge.in(2)
+    broadcast.out(0) ~> step1 ~> merge
+    broadcast.out(1) ~> step2 ~> merge ~> toResponse 
+    broadcast.out(2) ~> step3 ~> merge
 
-    merge.out ~> toResponse
-
-    (broadcast.in, toResponse.out)
+    (broadcast.in, toResponse.outlet)
   }
 
   // Handles port 8090
