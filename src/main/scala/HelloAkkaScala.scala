@@ -39,7 +39,7 @@ object Boot extends App {
 
   // broadcast sends the incoming event to multiple targets
   /* had to add parallelism here */
-  val bCast = Broadcast[HttpRequest](1)
+  val bCast = Broadcast[HttpRequest](3)
 
   // some basic steps that each retrieve a different ticket value (as a future)
   /* had to add parallelism here */
@@ -48,8 +48,8 @@ object Boot extends App {
   val step3 = Flow[HttpRequest].mapAsync[String](1, getTickerHandler("MSFT"))
 
   // We'll use the source and output provided by the http endpoint
-  val in = UndefinedSource[HttpRequest]
-  val out = UndefinedSink[HttpResponse]
+  //val in = UndefinedSource[HttpRequest]
+  //val out = UndefinedSink[HttpResponse]
 
   // waits for events on the three inputs and returns a response
   val zip = ZipWith[String, String, String, HttpResponse] (
@@ -58,39 +58,47 @@ object Boot extends App {
 
   // when an element is available on one of the inputs, take
   // that one, igore the rest
-  val merge = Merge[String](3)
+
   // since merge doesn't output a HttpResponse add an additional map step.
   val mapToResponse = Flow[String].map[HttpResponse](
     (inp:String) => HttpResponse(status = StatusCodes.OK, entity = inp)
   )
 
-  // define a flow which broadcasts the request to the three
-  // steps, and uses the zipWith to combine the elements before
-  val broadCastZipFlow = Flow[HttpRequest, HttpResponse]() {
-    implicit builder =>
-
-            bCast ~> step1 ~> zip.input1
-      in ~> bCast ~> step2 ~> zip.input2 ~> out
-            bCast ~> step3 ~> zip.input3
-
-      (in, out)
+  val broadCastZipFlow = Flow() { implicit b =>
+    import FlowGraph.Implicits._
+    
+    val broadcast = b.add(Broadcast[HttpRequest](3))
+    val zipit = b.add(zip)
+    
+    broadcast.out(0) ~> step1 ~> zipit.in0
+    broadcast.out(1) ~> step2 ~> zipit.in1
+    broadcast.out(2) ~> step3 ~> zipit.in2
+    
+    (broadcast.in, zipit.out)
   }
+  
 
   // define another flow. This uses the merge function which
   // takes the first available response
-  val broadCastMergeFlow = Flow[HttpRequest, HttpResponse]() {
-    implicit builder =>
+  val broadCastMergeFlow = Flow() { implicit b =>
+    import FlowGraph.Implicits._
+    
+    val broadcast = b.add(Broadcast[HttpRequest](3))
+    val merge = b.add(Merge[String](3))
+    val toResponse = b.add(mapToResponse)
+    
+    broadcast.out(0) ~> step1 ~> merge.in(0)
+    broadcast.out(1) ~> step2 ~> merge.in(1) 
+    broadcast.out(2) ~> step3 ~> merge.in(2)
 
-            bCast ~> step1 ~> merge
-      in ~> bCast ~> step2 ~> merge ~> mapToResponse ~> out
-            bCast ~> step3 ~> merge
+    merge.out ~> toResponse
 
-      (in, out)
+    (broadcast.in, toResponse.out)
   }
 
   // Handles port 8090
   serverBinding1.to(Sink.foreach { connection =>
-    connection.handleWith(broadCastMergeFlow)
+    connection.handleWith(broadCastMergeFlow) //We can switch the flow here
 //    idActor ! "start"
   }).run()
 
