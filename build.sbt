@@ -15,11 +15,14 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http-scala-experimental" % "1.0-RC1",
   "org.reactivemongo" %% "reactivemongo" % "0.10.5.0.akka23",
   "org.reactivemongo" %% "play2-reactivemongo" % "0.10.5.0.akka23",
-  "com.typesafe.play" %% "play-json" % "2.4.0-RC1",
-  "com.typesafe.play" %% "play-iteratees" % "2.4.0-RC1",
+  "com.typesafe.play" %% "play-json" % "2.3.4",
+  "com.typesafe.play" %% "play-iteratees" % "2.3.4",
   "ch.qos.logback" % "logback-classic" % "1.1.2",
   "junit" % "junit" % "4.12" % "test",
   "com.novocode" % "junit-interface" % "0.11" % "test"
 )
 
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-v")
+
+
+fork in run := true
