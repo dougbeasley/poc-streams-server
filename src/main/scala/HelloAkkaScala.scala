@@ -13,6 +13,8 @@ import akka.stream.ActorFlowMaterializer
 
 import scala.util.Properties
 
+import java.net.{InetSocketAddress, InetAddress}
+
 /**
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
  * through an Akka flow.
@@ -30,11 +32,12 @@ object Boot extends App {
                         Http(system).bind(interface = "localhost", port = 8090)
   */
   val port = Properties.envOrElse("PORT", "8091").toInt
-
-  println("Starting on port: "+port)
+  val localhost = InetAddress.getLocalHost
+  val localIpAddress = localhost.getHostAddress  
+  println(s"Starting servce on on $localIpAddress:$port")
 
   val serverBinding2:  Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
-                        Http(system).bind(interface = "localhost", port)
+                        Http(system).bind(localIpAddress, port)
 
 
   // helper actor for some logging
