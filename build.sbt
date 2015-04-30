@@ -1,4 +1,8 @@
-name := """hello-akka"""
+import NativePackagerKeys._
+
+packageArchetype.java_application
+
+name := """poc-streams-server"""
 
 version := "1.0"
 
