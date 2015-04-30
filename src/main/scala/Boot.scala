@@ -11,6 +11,7 @@ import play.api.libs.json._
 import akka.http.scaladsl.Http
 import akka.stream.ActorFlowMaterializer
 
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{Directives, Route}
 
 import scala.util.Properties
@@ -105,21 +106,23 @@ object Boot extends App with Directives {
 
   val postsDirective = pathPrefix("posts") {
     pathEnd {
-      complete("get all posts") 
+      complete {
+        val posts = Database.findAllPosts
+        posts.map[ToResponseMarshallable] {
+          convertToString
+        }
+      }
     } ~
-    path(IntNumber) { int =>
-      complete(if (int % 2 == 0) "even post" else "odd post")
+    path(Segment) { id =>
+      complete {
+        val post = Database.findPost(id)
+        post.map[ToResponseMarshallable] {
+          convertToString
+        }
+      }
     }
   }
 
-/*
-  // Handles port 8090
-  serverBinding1.to(Sink.foreach { connection =>
-    connection.handleWith(broadCastMergeFlow) //We can switch the flow here
-//    idActor ! "start"
-  }).run()
-*/
-  // Handles port 8091
   server.to(Sink.foreach { connection =>
     connection.handleWith(Flow[HttpRequest].mapAsync(1, Route.asyncHandler(postsDirective))) //Had to add parellelism here
 //    idActor ! "start"
@@ -143,9 +146,6 @@ object Boot extends App with Directives {
     }
   }
 
-
-
-  
 
 
   // With an async handler, we use futures. Threads aren't blocked.

@@ -50,8 +50,8 @@ object Database {
       .collect[List]()
   }
 
-  def findTicker(ticker: String) : Future[Option[BSONDocument]] = {
-    val query = BSONDocument("Ticker" -> ticker)
+  def findPost(id: String) : Future[Option[BSONDocument]] = {
+    val query = BSONDocument("id" -> id)
 
     Database.collection
       .find(query)
