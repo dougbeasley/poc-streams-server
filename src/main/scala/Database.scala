@@ -4,6 +4,8 @@ import reactivemongo.bson.BSONDocument
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
+import scala.util.Properties
+
 object Database {
 
   val collection = connect()
@@ -11,8 +13,11 @@ object Database {
 
   def connect(): BSONCollection = {
 
+    val uri = Properties.envOrElse("MONGOLAB_URI", "localhost")
+
+
     val driver = new MongoDriver
-    val connection = driver.connection(List("localhost"))
+    val connection = driver.connection(List(uri))
 
     val db = connection("akka")
     db.collection("stocks")
