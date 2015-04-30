@@ -11,6 +11,8 @@ import play.api.libs.json._
 import akka.http.scaladsl.Http
 import akka.stream.ActorFlowMaterializer
 
+import akka.http.scaladsl.server.{Directives, Route}
+
 import scala.util.Properties
 
 import java.net.{InetSocketAddress, InetAddress}
@@ -19,24 +21,21 @@ import java.net.{InetSocketAddress, InetAddress}
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
  * through an Akka flow.
  */
-object Boot extends App {
+object Boot extends App with Directives {
 
   // the actor system to use. Required for flowmaterializer and HTTP.
   // passed in implicit
   implicit val system = ActorSystem("Streams")
   implicit val materializer = ActorFlowMaterializer()
 
-  // start the server on the specified interface and port.
-  /*
-  val serverBinding1:  Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
-                        Http(system).bind(interface = "localhost", port = 8090)
-  */
+  // get the environment info.
   val port = Properties.envOrElse("PORT", "8091").toInt
   val localhost = InetAddress.getLocalHost
   val localIpAddress = localhost.getHostAddress  
   println(s"Starting servce on on $localIpAddress:$port")
 
-  val serverBinding2:  Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
+  /* setup the server */
+  val server:  Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
                         Http(system).bind(localIpAddress, port)
 
 
@@ -104,6 +103,15 @@ object Boot extends App {
     (broadcast.in, toResponse.outlet)
   }
 
+  val postsDirective = pathPrefix("posts") {
+    pathEnd {
+      complete("get all posts") 
+    } ~
+    path(IntNumber) { int =>
+      complete(if (int % 2 == 0) "even post" else "odd post")
+    }
+  }
+
 /*
   // Handles port 8090
   serverBinding1.to(Sink.foreach { connection =>
@@ -112,8 +120,8 @@ object Boot extends App {
   }).run()
 */
   // Handles port 8091
-  serverBinding2.to(Sink.foreach { connection =>
-    connection.handleWith(Flow[HttpRequest].mapAsync(1, asyncHandler)) //Had to add parellelism here
+  server.to(Sink.foreach { connection =>
+    connection.handleWith(Flow[HttpRequest].mapAsync(1, Route.asyncHandler(postsDirective))) //Had to add parellelism here
 //    idActor ! "start"
   }).run()
 
@@ -134,6 +142,11 @@ object Boot extends App {
       }
     }
   }
+
+
+
+  
+
 
   // With an async handler, we use futures. Threads aren't blocked.
   def asyncHandler(request: HttpRequest): Future[HttpResponse] = {
