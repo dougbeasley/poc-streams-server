@@ -142,13 +142,13 @@ object Boot extends App {
     request match {
 
       // match specific path. Returns all the avaiable tickers
-      case HttpRequest(GET, Uri.Path("/getAllTickers"), _, _, _) => {
+      case HttpRequest(GET, Uri.Path("/posts"), _, _, _) => {
 
         // make a db call, which returns a future.
         // use for comprehension to flatmap this into
         // a Future[HttpResponse]
         for {
-          input <- Database.findAllTickers
+          input <- Database.findAllPosts
         } yield {
           HttpResponse(entity = convertToString(input))
         }

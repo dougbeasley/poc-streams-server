@@ -37,16 +37,15 @@ object Database {
     //val db = connection("akka")
     //db.collection("stocks")
     // val db = connection.get.db
-    db.collection("stocks")
+    db.collection("posts")
   }
 
-  def findAllTickers(): Future[List[BSONDocument]] = {
+  def findAllPosts(): Future[List[BSONDocument]] = {
     val query = BSONDocument()
-    val filter = BSONDocument("Company" -> 1, "Country" -> 1, "Ticker" -> 1)
 
     // which results in a Future[List[BSONDocument]]
     Database.collection
-      .find(query, filter)
+      .find(query)
       .cursor[BSONDocument]
       .collect[List]()
   }
