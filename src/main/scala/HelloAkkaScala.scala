@@ -11,6 +11,8 @@ import play.api.libs.json._
 import akka.http.scaladsl.Http
 import akka.stream.ActorFlowMaterializer
 
+import scala.util.Properties
+
 /**
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
  * through an Akka flow.
@@ -23,11 +25,16 @@ object Boot extends App {
   implicit val materializer = ActorFlowMaterializer()
 
   // start the server on the specified interface and port.
+  /*
   val serverBinding1:  Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
                         Http(system).bind(interface = "localhost", port = 8090)
-  
+  */
+  val port = Properties.envOrElse("PORT", "8091").toInt
+
+  println("Starting on port: "+port)
+
   val serverBinding2:  Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
-                        Http(system).bind(interface = "localhost", port = 8091)
+                        Http(system).bind(interface = "localhost", port)
 
 
   // helper actor for some logging
@@ -94,12 +101,13 @@ object Boot extends App {
     (broadcast.in, toResponse.outlet)
   }
 
+/*
   // Handles port 8090
   serverBinding1.to(Sink.foreach { connection =>
     connection.handleWith(broadCastMergeFlow) //We can switch the flow here
 //    idActor ! "start"
   }).run()
-
+*/
   // Handles port 8091
   serverBinding2.to(Sink.foreach { connection =>
     connection.handleWith(Flow[HttpRequest].mapAsync(1, asyncHandler)) //Had to add parellelism here
