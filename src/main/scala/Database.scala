@@ -18,13 +18,6 @@ object Database {
 
 
     val driver = new MongoDriver
-    //val connection = driver.connection(List(uri))
-
-    // val connection: Try[MongoConnection] =
-    //   MongoConnection.parseURI(uri).map { parsedUri =>
-    //     driver.connection(parsedUri)
-    //   }
-
 
     val parsedURI = MongoConnection.parseURI(uri) match {
       case Success(parsedURI) if parsedURI.db.isDefined =>
@@ -33,24 +26,20 @@ object Database {
 
     val connection = driver.connection(parsedURI)
     val db = DB(parsedURI.db.get, connection)
-
-    //val db = connection("akka")
-    //db.collection("stocks")
-    // val db = connection.get.db
     db.collection("posts")
   }
 
-  def findAllPosts(): Future[List[BSONDocument]] = {
+  def findAllPosts(): Future[List[Post]] = {
     val query = BSONDocument()
 
     // which results in a Future[List[BSONDocument]]
     Database.collection
       .find(query)
-      .cursor[BSONDocument]
+      .cursor[Post]
       .collect[List]()
   }
 
-  def findPost(id: String) : Future[Option[BSONDocument]] = {
+  def findPost(id: String) : Future[Option[Post]] = {
     val query = BSONDocument("id" -> id)
 
     Database.collection

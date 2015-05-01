@@ -18,11 +18,12 @@ import scala.util.Properties
 
 import java.net.{InetSocketAddress, InetAddress}
 
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 /**
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
  * through an Akka flow.
  */
-object Boot extends App with Directives {
+object Boot extends App with Directives with Protocols with SprayJsonSupport {
 
   // the actor system to use. Required for flowmaterializer and HTTP.
   // passed in implicit
@@ -107,18 +108,12 @@ object Boot extends App with Directives {
   val postsDirective = pathPrefix("posts") {
     pathEnd {
       complete {
-        val posts = Database.findAllPosts
-        posts.map[ToResponseMarshallable] {
-          convertToString
-        }
+        Database.findAllPosts
       }
     } ~
     path(Segment) { id =>
       complete {
-        val post = Database.findPost(id)
-        post.map[ToResponseMarshallable] {
-          convertToString
-        }
+        Database.findPost(id)
       }
     }
   }
@@ -128,9 +123,10 @@ object Boot extends App with Directives {
 //    idActor ! "start"
   }).run()
 
+
   def getTickerHandler(tickName: String)(request: HttpRequest): Future[String] = {
     // query the database
-    val ticker = Database.findTicker(tickName)
+    val ticker = Database.findPost(tickName) //This will fail
 
     Thread.sleep(Math.random() * 1000 toInt)
 
@@ -147,7 +143,7 @@ object Boot extends App with Directives {
   }
 
 
-
+/*
   // With an async handler, we use futures. Threads aren't blocked.
   def asyncHandler(request: HttpRequest): Future[HttpResponse] = {
 
@@ -204,8 +200,9 @@ object Boot extends App with Directives {
       }
     }
   }
+*/
 
-
+/*
   def convertToString(input: List[BSONDocument]) : String = {
     input
       .map(f => convertToString(f))
@@ -215,8 +212,14 @@ object Boot extends App with Directives {
   def convertToString(input: BSONDocument) : String = {
     Json.stringify(BSONFormats.toJSON(input))
   }
+  */
 }
 
+trait Protocols extends DefaultJsonProtocol {
+  implicit val postFormat = jsonFormat2(Post.apply)
+  implicit val imageFormat = jsonFormat3(Image.apply)
+  implicit val statsFormat = jsonFormat3(Stats.apply)
+}
 
 class IDActor extends Actor with ActorLogging {
 
