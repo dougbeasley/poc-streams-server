@@ -1,5 +1,7 @@
 import reactivemongo.api._
 import reactivemongo.api.collections.default.BSONCollection
+import play.modules.reactivemongo.json.collection.JSONCollection
+import play.api.libs.json._
 import reactivemongo.bson.BSONDocument
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -7,12 +9,15 @@ import scala.concurrent.Future
 import scala.util.Properties
 import scala.util.{Try,Success,Failure}
 
+
+
 object Database {
 
-  val collection = connect()
+  import JsonFormats._
 
+  def collection: JSONCollection = connect()
 
-  def connect(): BSONCollection = {
+  def connect(): JSONCollection = {
 
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
@@ -26,11 +31,11 @@ object Database {
 
     val connection = driver.connection(parsedURI)
     val db = DB(parsedURI.db.get, connection)
-    db.collection("posts")
+    db.collection[JSONCollection]("posts")
   }
 
   def findAllPosts(): Future[List[Post]] = {
-    val query = BSONDocument()
+    val query = Json.obj()
 
     // which results in a Future[List[BSONDocument]]
     Database.collection
@@ -39,12 +44,11 @@ object Database {
       .collect[List]()
   }
 
-  def findPost(id: String) : Future[Option[Post]] = {
-    val query = BSONDocument("id" -> id)
+  def findById(id: String) : Future[Option[Post]] = {
+    val query = Json.obj("id" -> id)
 
     Database.collection
       .find(query)
-      .one
+      .one[Post]
   }
-
 }

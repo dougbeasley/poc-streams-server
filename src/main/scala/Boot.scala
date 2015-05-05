@@ -24,7 +24,9 @@ import play.api.libs.json._
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
  * through an Akka flow.
  */
-object Boot extends App with Directives with Protocols {
+object Boot extends App with Directives {
+
+  import JsonFormats._
 
   // the actor system to use. Required for flowmaterializer and HTTP.
   // passed in implicit
@@ -49,12 +51,12 @@ object Boot extends App with Directives with Protocols {
   val postsDirective = pathPrefix("posts") {
     pathEnd {
       complete {
-        Json.toJson(Database.findAllPosts)
+        Database.findAllPosts.map { posts => Json.stringify(Json.toJson(posts)) }
       }
     } ~
     path(Segment) { id =>
       complete {
-        Json.toJson(Database.findPost(id))
+        Database.findById(id).map { post => Json.stringify(Json.toJson(post)) }
       }
     }
   }
@@ -63,12 +65,6 @@ object Boot extends App with Directives with Protocols {
     connection.handleWith(Flow[HttpRequest].mapAsync(1, Route.asyncHandler(postsDirective))) //Had to add parellelism here
 //    idActor ! "start"
   }).run()
-}
-
-trait Protocols {
-  implicit val imageFormat = Json.writes[Image]
-  implicit val statsFormat = Json.writes[Stats]
-  implicit val postFormat = Json.writes[Post]
 }
 
 
