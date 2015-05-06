@@ -72,7 +72,7 @@ object Boot extends App with Directives with Protocols {
           val stats = Stats(0,0,0)
           val post = Post( java.util.UUID.randomUUID.toString, image, stats)
 
-          Database.create(post).map( _ => post)
+          Database.create(post).map( _ => Created -> post)
         }
       }
     } ~
