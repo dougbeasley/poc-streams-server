@@ -21,7 +21,6 @@ object Database {
 
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
-
     val driver = new MongoDriver
 
     val parsedURI = MongoConnection.parseURI(uri) match {
@@ -37,7 +36,6 @@ object Database {
   def findAllPosts(): Future[List[Post]] = {
     val query = Json.obj()
 
-    // which results in a Future[List[BSONDocument]]
     Database.collection
       .find(query)
       .cursor[Post]
