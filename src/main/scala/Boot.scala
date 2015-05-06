@@ -1,6 +1,7 @@
 import akka.actor._
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.StatusCodes._
 import akka.stream.scaladsl._
 import akka.stream.scaladsl.Flow
 import play.modules.reactivemongo.json.BSONFormats
@@ -15,6 +16,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{Directives, Route}
 
 import scala.util.Properties
+import scala.util.Success
 
 import java.net.{InetSocketAddress, InetAddress}
 
@@ -32,6 +34,7 @@ trait Protocols extends DefaultJsonProtocol {
   implicit val imageFormat = jsonFormat3(Image.apply)
   implicit val statsFormat = jsonFormat3(Stats.apply)
   implicit val postFormat = jsonFormat3(Post.apply)
+  implicit val imagePostRequestFormat = jsonFormat2(ImagePostRequest.apply)
 }
 
 object Boot extends App with Directives with Protocols {
@@ -58,8 +61,19 @@ object Boot extends App with Directives with Protocols {
 
   val postsDirective = pathPrefix("posts") {
     pathEnd {
-      complete {
-        Database.findAllPosts
+      get {
+        complete {
+          Database.findAllPosts
+        }
+      } ~
+      (post & entity(as[ImagePostRequest])) { ipr =>
+        complete {
+          val image = Image(ipr.id, ipr.url, ipr.url)
+          val stats = Stats(0,0,0)
+          val post = Post( java.util.UUID.randomUUID.toString, image, stats)
+
+          Database.create(post).map( _ => post)
+        }
       }
     } ~
     path(Segment) { id =>
@@ -88,7 +102,5 @@ class IDActor extends Actor with ActorLogging {
     case ActorIdentity(_, Some(ref)) =>
       log.info(ref.toString())
       self ! ref.path
-
-
   }
 }

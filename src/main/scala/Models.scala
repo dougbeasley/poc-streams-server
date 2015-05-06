@@ -9,11 +9,10 @@ case class Image(id : String, url : String, cdn : String)
 case class Stats(reported : Int, favorites : Int, found : Int)
 case class Post(id: String, image: Image, stats: Stats)
 
-object JsonFormats {
-	import play.api.libs.json.Json
-	import play.api.data._
+case class ImagePostRequest(id: String, url : String)
 
-	implicit val imageFormat = Json.format[Image]
-	implicit val statsFormat = Json.format[Stats]
-	implicit val postFormat = Json.format[Post]
+object Marshallers {
+	implicit val imageBSONHandler = Macros.handler[Image]
+	implicit val statsBSONHandler = Macros.handler[Stats]
+	implicit val postBSONHandler = Macros.handler[Post]
 }
