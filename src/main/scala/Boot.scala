@@ -27,9 +27,14 @@ import spray.json.DefaultJsonProtocol
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
  * through an Akka flow.
  */
-object Boot extends App with Directives with Protocols {
 
-  import JsonFormats._
+trait Protocols extends DefaultJsonProtocol {
+  implicit val imageFormat = jsonFormat3(Image.apply)
+  implicit val statsFormat = jsonFormat3(Stats.apply)
+  implicit val postFormat = jsonFormat3(Post.apply)
+}
+
+object Boot extends App with Directives with Protocols {
 
   // the actor system to use. Required for flowmaterializer and HTTP.
   // passed in implicit
@@ -54,26 +59,20 @@ object Boot extends App with Directives with Protocols {
   val postsDirective = pathPrefix("posts") {
     pathEnd {
       complete {
-        Database.findAllPosts.map[ToResponseMarshallable]
+        Database.findAllPosts
       }
     } ~
     path(Segment) { id =>
       complete {
-        Database.findById(id).map[ToResponseMarshallable]
+        Database.findById(id)
       }
     }
   }
 
   server.to(Sink.foreach { connection =>
-    connection.handleWith(Flow[HttpRequest].mapAsync(1, Route.asyncHandler(postsDirective))) //Had to add parellelism here
+    connection.handleWith(Flow[HttpRequest].mapAsync(4)(Route.asyncHandler(postsDirective))) //Had to add parellelism here
 //    idActor ! "start"
   }).run()
-}
-
-trait Protocols extends DefaultJsonProtocol {
-  implicit val imageFormat = jsonFormat3(Image.apply)
-  implicit val statsFormat = jsonFormat3(Stats.apply)
-  implicit val postFormat = jsonFormat3(Post.apply)
 }
 
 class IDActor extends Actor with ActorLogging {
