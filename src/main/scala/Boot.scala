@@ -20,11 +20,14 @@ import java.net.{InetSocketAddress, InetAddress}
 
 import play.api.libs.json._
 
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import spray.json.DefaultJsonProtocol
+
 /**
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
  * through an Akka flow.
  */
-object Boot extends App with Directives {
+object Boot extends App with Directives with Protocols {
 
   import JsonFormats._
 
@@ -51,12 +54,12 @@ object Boot extends App with Directives {
   val postsDirective = pathPrefix("posts") {
     pathEnd {
       complete {
-        Database.findAllPosts.map { posts => Json.stringify(Json.toJson(posts)) }
+        Database.findAllPosts.map[ToResponseMarshallable]
       }
     } ~
     path(Segment) { id =>
       complete {
-        Database.findById(id).map { post => Json.stringify(Json.toJson(post)) }
+        Database.findById(id).map[ToResponseMarshallable]
       }
     }
   }
@@ -67,6 +70,11 @@ object Boot extends App with Directives {
   }).run()
 }
 
+trait Protocols extends DefaultJsonProtocol {
+  implicit val imageFormat = jsonFormat3(Image.apply)
+  implicit val statsFormat = jsonFormat3(Stats.apply)
+  implicit val postFormat = jsonFormat3(Post.apply)
+}
 
 class IDActor extends Actor with ActorLogging {
 
