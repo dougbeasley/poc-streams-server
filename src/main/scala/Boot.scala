@@ -107,14 +107,14 @@ object Boot extends App with Directives with Protocols {
     } ~
     path("upload") {
       post {        
-        entity(as[Multipart.FormData]) { entity =>
-          val files = entity.parts.mapAsync(4) { bodyPart: Multipart.FormData.BodyPart =>
-            ///bodyPart.entity.dataBytes.runWith(Sink.file(...)) when https://github.com/akka/akka/pull/17211 is merged...
-            bodyPart.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { contents =>
-              s"Received file: ${bodyPart.filename} with contents:\n$contents"
+        entity(as[Multipart.FormData]) { formData =>
+          complete {
+            val details: Source[String, Any] = formData.parts.map { 
+              case Multipart.FormData.BodyPart(name, entity, params, headers) =>
+                name
             }
+            details //s"""{"status": "Processed POST request, details=$details" }"""
           }
-          complete(files)
         }
       }
     }
