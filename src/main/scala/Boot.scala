@@ -2,6 +2,9 @@ import akka.actor._
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.StatusCodes._
+
+import scala.concurrent.ExecutionContext
+
 import akka.stream.scaladsl._
 import akka.stream.scaladsl.Flow
 import play.modules.reactivemongo.json.BSONFormats
@@ -22,8 +25,13 @@ import java.net.{InetSocketAddress, InetAddress}
 
 import play.api.libs.json._
 
+import akka.event.{LoggingAdapter, Logging}
+
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json.DefaultJsonProtocol
+import akka.http.scaladsl.marshalling.{ Marshaller, ToResponseMarshaller }
+
+import akka.util.ByteString
 
 /**
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
@@ -37,12 +45,21 @@ trait Protocols extends DefaultJsonProtocol {
   implicit val imagePostRequestFormat = jsonFormat2(ImagePostRequest.apply)
 }
 
+// trait Marshallers { 
+//   implicit def stringStreamMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[String, Unit]] =
+//     Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { s =>
+//       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
+//     }
+// }
+
 object Boot extends App with Directives with Protocols {
 
   // the actor system to use. Required for flowmaterializer and HTTP.
   // passed in implicit
   implicit val system = ActorSystem("Streams")
   implicit val materializer = ActorFlowMaterializer()
+
+  val logger = Logging(system, getClass)
 
   // get the environment info.
   val port = Properties.envOrElse("PORT", "8091").toInt
@@ -58,6 +75,11 @@ object Boot extends App with Directives with Protocols {
   // helper actor for some logging
   val idActor = system.actorOf(Props[IDActor],"idActor");
   idActor ! "start"
+
+  implicit def stringStreamMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[String, Any]] =
+    Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { s =>
+      HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
+    }
 
   val postsDirective = pathPrefix("posts") {
     pathEnd {
@@ -77,8 +99,23 @@ object Boot extends App with Directives with Protocols {
       }
     } ~
     path(Segment) { id =>
-      complete {
-        Database.findById(id)
+      get {
+        complete {
+          Database.findById(id)
+        }
+      }
+    } ~
+    path("upload") {
+      post {        
+        entity(as[Multipart.FormData]) { entity =>
+          val files = entity.parts.mapAsync(4) { bodyPart: Multipart.FormData.BodyPart =>
+            ///bodyPart.entity.dataBytes.runWith(Sink.file(...)) when https://github.com/akka/akka/pull/17211 is merged...
+            bodyPart.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { contents =>
+              s"Received file: ${bodyPart.filename} with contents:\n$contents"
+            }
+          }
+          complete(files)
+        }
       }
     }
   }
