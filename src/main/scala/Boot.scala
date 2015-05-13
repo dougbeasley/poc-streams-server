@@ -107,11 +107,11 @@ object Boot extends App with Directives with Protocols {
     } ~
     path("upload") {
       post {        
-        entity(as[Multipart.FormData]) { formData =>
+        entity(as[Multipart.General]) { formData =>
           complete {
             val details: Source[String, Any] = formData.parts.map { 
-              case Multipart.FormData.BodyPart(name, entity, params, headers) =>
-                name
+              case Multipart.General.BodyPart(entity, headers) =>
+                entity.contentType.toString()
             }
             details //s"""{"status": "Processed POST request, details=$details" }"""
           }
