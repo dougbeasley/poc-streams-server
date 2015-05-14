@@ -2,6 +2,7 @@ import akka.actor._
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers._
 
 import scala.concurrent.ExecutionContext
 
@@ -74,7 +75,7 @@ object Boot extends App with Directives with Protocols {
 
   // helper actor for some logging
   val idActor = system.actorOf(Props[IDActor],"idActor");
-  idActor ! "start"
+  //idActor ! "start"
 
   implicit def stringStreamMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[String, Any]] =
     Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { s =>
@@ -109,9 +110,17 @@ object Boot extends App with Directives with Protocols {
       post {        
         entity(as[Multipart.General]) { formData =>
           complete {
+       
             val details: Source[String, Any] = formData.parts.map { 
               case Multipart.General.BodyPart(entity, headers) =>
-                entity.contentType.toString()
+                val ct = entity.contentType
+                val h = headers mkString ","
+
+                val cd = headers.find { h => h.name == "Content-Disposition" }
+
+                val name = cd.get.value().split(";").map(_.trim) mkString "----"
+
+                s"""{ Handling entity with $ct and $cd and $name }"""
             }
             details //s"""{"status": "Processed POST request, details=$details" }"""
           }
@@ -122,7 +131,7 @@ object Boot extends App with Directives with Protocols {
 
   server.to(Sink.foreach { connection =>
     connection.handleWith(Flow[HttpRequest].mapAsync(4)(Route.asyncHandler(postsDirective))) //Had to add parellelism here
-//    idActor ! "start"
+    idActor ! "start"
   }).run()
 }
 
