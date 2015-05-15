@@ -46,6 +46,13 @@ trait Protocols extends DefaultJsonProtocol {
   implicit val imagePostRequestFormat = jsonFormat2(ImagePostRequest.apply)
 }
 
+
+trait FileIO {
+
+  val countBytesSink: Sink[Int, Future[Int]] = Sink.fold[Int, Int](0)(_ + _)
+
+}
+
 // trait Marshallers { 
 //   implicit def stringStreamMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[String, Unit]] =
 //     Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { s =>
@@ -111,6 +118,14 @@ object Boot extends App with Directives with Protocols {
         entity(as[Multipart.General]) { formData =>
           complete {
        
+           
+            val content: Source[ByteString, Any] =
+              formData.parts.filter {
+                case Multipart.General.BodyPart(entity, headers) =>
+                  headers.exists { header => header.params.contains("name" -> "content") } 
+              }
+
+            /*
             val details: Source[String, Any] = formData.parts.map { 
               case Multipart.General.BodyPart(entity, headers) =>
                 val ct = entity.contentType
@@ -118,11 +133,13 @@ object Boot extends App with Directives with Protocols {
 
                 val cd = headers.find { h => h.name == "Content-Disposition" }
 
-                val name = cd.get.value().split(";").map(_.trim) mkString "----"
+                val name = cd.get.value()
 
                 s"""{ Handling entity with $ct and $cd and $name }"""
             }
             details //s"""{"status": "Processed POST request, details=$details" }"""
+            */
+
           }
         }
       }
@@ -130,7 +147,7 @@ object Boot extends App with Directives with Protocols {
   }
 
   server.to(Sink.foreach { connection =>
-    connection.handleWith(Flow[HttpRequest].mapAsync(4)(Route.asyncHandler(postsDirective))) //Had to add parellelism here
+    connection.handleWith(Flow[HttpRequest].mapAsync(4)(Route.asyncHandler(postsDirective))) //Had to add parallelism here
     idActor ! "start"
   }).run()
 }
