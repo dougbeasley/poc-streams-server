@@ -122,8 +122,8 @@ object Boot extends App with Directives with Protocols {
             val content: Source[ByteString, Any] =
               formData.parts.filter {
                 case Multipart.General.BodyPart(entity, headers) =>
-                  headers.exists { header => header.params.contains("name" -> "content") } 
-              }
+                  headers.exists(_.name == "Content-Disposition") //{ header => header.name.contains("name" -> "content") } 
+              }.map(_.entity.dataBytes)
 
             /*
             val details: Source[String, Any] = formData.parts.map { 
