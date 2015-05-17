@@ -116,14 +116,13 @@ object Boot extends App with Directives with Protocols {
     path("upload") {
       post {        
         entity(as[Multipart.General]) { formData =>
-          complete {
-       
+          complete {       
            
-            val content: Source[ByteString, Any] =
+            val content: Source[String, Any] =
               formData.parts.filter {
                 case Multipart.General.BodyPart(entity, headers) =>
                   headers.exists(_.name == "Content-Disposition") //{ header => header.name.contains("name" -> "content") } 
-              }.map(_.entity.dataBytes)
+              }.map(_.entity.dataBytes).flatten(FlattenStrategy.concat).map(_ mkString "-")
 
             /*
             val details: Source[String, Any] = formData.parts.map { 
@@ -136,10 +135,9 @@ object Boot extends App with Directives with Protocols {
                 val name = cd.get.value()
 
                 s"""{ Handling entity with $ct and $cd and $name }"""
-            }
             details //s"""{"status": "Processed POST request, details=$details" }"""
             */
-
+            content 
           }
         }
       }
