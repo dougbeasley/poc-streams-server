@@ -67,7 +67,7 @@ object Boot extends App with Directives with Protocols {
   implicit val system = ActorSystem("Streams")
   implicit val materializer = ActorFlowMaterializer()
 
-  val logger = Logging(system, getClass)
+  val log = Logging(system, getClass)
 
   // get the environment info.
   val port = Properties.envOrElse("PORT", "8091").toInt
@@ -118,11 +118,16 @@ object Boot extends App with Directives with Protocols {
         entity(as[Multipart.General]) { formData =>
           complete {       
            
+            formData.parts.runForeach { part =>
+              log.info(s"$part")
+            }
+
+
             val content: Source[String, Any] =
               formData.parts.filter {
                 case Multipart.General.BodyPart(entity, headers) =>
                   headers.exists(_.name == "Content-Disposition") //{ header => header.name.contains("name" -> "content") } 
-              }.map(_.entity.dataBytes).flatten(FlattenStrategy.concat).map(_ mkString "-")
+              }.map(_.entity.dataBytes).flatten(FlattenStrategy.concat).map(_ mkString ",")
 
             /*
             val details: Source[String, Any] = formData.parts.map { 
