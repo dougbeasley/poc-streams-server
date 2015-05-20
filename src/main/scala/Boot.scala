@@ -89,6 +89,9 @@ object Boot extends App with Directives with Protocols {
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
     }
 
+
+
+
   val postsDirective = pathPrefix("posts") {
     pathEnd {
       get {
@@ -122,12 +125,14 @@ object Boot extends App with Directives with Protocols {
               log.info(s"$part")
             }
 
+            val sumSink = Sink.fold[Int, Int](0)(_ + _)
 
             val content: Source[String, Any] =
               formData.parts.filter {
                 case Multipart.General.BodyPart(entity, headers) =>
                   headers.exists(_.name == "Content-Disposition") //{ header => header.name.contains("name" -> "content") } 
-              }.map(_.entity.dataBytes).flatten(FlattenStrategy.concat).map(_ mkString ",")
+              }.map(_.entity.dataBytes.map(b => 1).runWith(sumSink))
+                .mapAsync(4)(identity).map(_.toString())
 
             /*
             val details: Source[String, Any] = formData.parts.map { 
@@ -142,7 +147,7 @@ object Boot extends App with Directives with Protocols {
                 s"""{ Handling entity with $ct and $cd and $name }"""
             details //s"""{"status": "Processed POST request, details=$details" }"""
             */
-            content 
+            content
           }
         }
       }
