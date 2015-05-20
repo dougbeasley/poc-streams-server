@@ -119,35 +119,18 @@ object Boot extends App with Directives with Protocols {
     path("upload") {
       post {        
         entity(as[Multipart.General]) { formData =>
-          complete {       
-           
-            formData.parts.runForeach { part =>
-              log.info(s"$part")
-            }
+          complete {                  
 
-            val sumSink = Sink.fold[Int, Int](0)(_ + _)
-
+            /* map to the string representation */
             val content: Source[String, Any] =
-              formData.parts.filter {
-                case Multipart.General.BodyPart(entity, headers) =>
-                  headers.exists(_.name == "Content-Disposition") //{ header => header.name.contains("name" -> "content") } 
-              }.map(_.entity.dataBytes.map(b => 1).runWith(sumSink))
-                .mapAsync(4)(identity).map(_.toString())
+              formData.parts.map(_.entity.dataBytes)
+              .flatten(FlattenStrategy.concat)
+              .map(_.decodeString("UTF-8"))
 
-            /*
-            val details: Source[String, Any] = formData.parts.map { 
-              case Multipart.General.BodyPart(entity, headers) =>
-                val ct = entity.contentType
-                val h = headers mkString ","
-
-                val cd = headers.find { h => h.name == "Content-Disposition" }
-
-                val name = cd.get.value()
-
-                s"""{ Handling entity with $ct and $cd and $name }"""
-            details //s"""{"status": "Processed POST request, details=$details" }"""
-            */
-            content
+            /* this bypasses the marshaller, but se can just return content
+             * since we can marshall Source[String, Any] */
+            val stuff: Future[String] = content.runWith(Sink.head[String])
+            stuff
           }
         }
       }
