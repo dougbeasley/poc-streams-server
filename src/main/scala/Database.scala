@@ -81,12 +81,9 @@ object Database {
     val gfs = GridFS(db)
 
     /* setup storage */
-    val f = DefaultFileToSave(filename = "foo.dat")
-    val iStorage: Iteratee[Array[Byte], Future[ReadFile[BSONValue]]] = gfs.iteratee(f)
-    val (storage, result) = Streams.iterateeToSubscriber(iStorage)
+    val metadata = DefaultFileToSave(filename = "foo.dat")
+    val enumerator = Streams.publisherToEnumerator(in)
 
-    in.subscribe(storage)
-    
-    result //I think we need to return a flow endpoint 
+    gfs.save(enumerator, metadata)
   }
 }

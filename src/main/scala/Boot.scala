@@ -34,6 +34,11 @@ import akka.http.scaladsl.marshalling.{ Marshaller, ToResponseMarshaller }
 
 import akka.util.ByteString
 
+import org.reactivestreams.Publisher
+import reactivemongo.api.gridfs.ReadFile
+import reactivemongo.bson.BSONValue
+import scala.util.{ Failure, Success }
+
 /**
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
  * through an Akka flow.
@@ -89,6 +94,17 @@ object Boot extends App with Directives with Protocols {
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
     }
 
+  implicit def readFileMArshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Future[ReadFile[BSONValue]]] =
+    Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { f =>
+      val resp: String = f.onComplete {
+        case Success(file) =>
+          s"successfully saved file of id ${file.id}"
+        case Failure(e) =>
+          e.printStackTrace()
+          s"exception while saving the file!"
+      }
+      HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, resp))
+    }
 
 
 
@@ -122,15 +138,16 @@ object Boot extends App with Directives with Protocols {
           complete {                  
 
             /* map to the string representation */
-            val content: Source[String, Any] =
+            val content: Source[Array[Byte], Any] =
               formData.parts.map(_.entity.dataBytes)
               .flatten(FlattenStrategy.concat)
-              .map(_.decodeString("UTF-8"))
+              .map(_.toArray[Byte])
 
-            /* this bypasses the marshaller, but se can just return content
-             * since we can marshall Source[String, Any] */
-            val stuff: Future[String] = content.runWith(Sink.head[String])
-            stuff
+            val contentPublisher: Publisher[Array[Byte]] =
+                content.runWith(Sink.publisher)
+
+
+            Database.upload(contentPublisher)
           }
         }
       }
