@@ -27,6 +27,8 @@ libraryDependencies ++= {
     "org.reactivemongo" %% "play2-reactivemongo" % "0.10.5.0.akka23",
     "com.typesafe.play" %% "play-json" % playV,
     "com.typesafe.play" %% "play-iteratees" % playV,
+    "com.typesafe.play" %% "play-streams-experimental" % playV,
+
     "ch.qos.logback" % "logback-classic" % "1.1.2",
     "junit" % "junit" % "4.12" % "test",
     "com.novocode" % "junit-interface" % "0.11" % "test"
