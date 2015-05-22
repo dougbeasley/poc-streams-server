@@ -1,7 +1,6 @@
 import akka.stream.scaladsl._
 import reactivemongo.api._
 import reactivemongo.api.collections.default.BSONCollection
-import play.modules.reactivemongo.json.collection.JSONCollection
 import play.api.libs.json._
 import reactivemongo.bson.BSONDocument
 import reactivemongo.core.commands.LastError
