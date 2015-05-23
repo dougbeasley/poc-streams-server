@@ -67,7 +67,7 @@ object Database {
     Database.collection.insert(post)
   }
 
-  def download(id: String): Future[Publisher[Array[Byte]]] = {
+  def download(id: String): Future[Publisher[ByteString]] = {
 
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
@@ -84,7 +84,7 @@ object Database {
 
     val query = BSONDocument("_id" -> BSONObjectID(id))
     gfs.find(query).headOption.map {
-      case Some(file) => Streams.enumeratorToPublisher(gfs.enumerate(file))
+      case Some(file) => Streams.enumeratorToPublisher(gfs.enumerate(file) andThen Enumerator.eof map(ByteString(_)))
     }
   }
 

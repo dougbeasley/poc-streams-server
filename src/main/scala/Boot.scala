@@ -84,6 +84,14 @@ object Boot extends App with Directives with Protocols {
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, Source(f.map(_.filename).map(ByteString(_)))))
     }
 
+  implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[Publisher[ByteString], Unit]] =
+    Marshaller.opaque { s =>
+      HttpResponse(
+        entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`,
+            s.map(Source(_))
+            .flatten(FlattenStrategy.concat)))
+    }
+
   val postsDirective = pathPrefix("posts") {
     pathEnd {
       get {
@@ -107,39 +115,41 @@ object Boot extends App with Directives with Protocols {
             Database.findById(id)
           }
         }
-      } ~
-      path("uploads") {
-        pathEnd {
-          post {
-            entity(as[Multipart.General]) { formData =>
-              complete {
-
-                /* map to the string representation */
-                val content: Source[Array[Byte], Any] =
-                  formData.parts.map(_.entity.dataBytes)
-                    .flatten(FlattenStrategy.concat)
-                    .map(_.toArray[Byte])
-
-                val contentPublisher: Publisher[Array[Byte]] =
-                  content.runWith(Sink.publisher)
-
-                Database.upload(contentPublisher)
-              }
-            }
-          }
-        } ~
-          path(Segment) { id =>
-            get {
-              complete {
-                Database.download(id)
-              }
-            }
-          }
       }
   }
 
+  val uploadDirective = pathPrefix("uploads") {
+    pathEnd {
+      post {
+        entity(as[Multipart.General]) { formData =>
+          complete {
+
+            /* map to the string representation */
+            val content: Source[Array[Byte], Any] =
+              formData.parts.map(_.entity.dataBytes)
+                .flatten(FlattenStrategy.concat)
+                .map(_.toArray[Byte])
+
+            val contentPublisher: Publisher[Array[Byte]] =
+              content.runWith(Sink.publisher)
+
+            Database.upload(contentPublisher)
+          }
+        }
+      }
+    } ~ path(Segment) { id =>
+      get {
+        complete {
+          Source(Database.download(id))
+        }
+      }
+    }
+  }
+
+  val directives: Route = postsDirective ~ uploadDirective
+  
   server.to(Sink.foreach { connection =>
-    connection.handleWith(Flow[HttpRequest].mapAsync(4)(Route.asyncHandler(postsDirective))) //Had to add parallelism here
+    connection.handleWith(Flow[HttpRequest].mapAsync(4)(Route.asyncHandler(directives))) //Had to add parallelism here
     idActor ! "start"
   }).run()
 }
