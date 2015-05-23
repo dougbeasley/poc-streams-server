@@ -20,6 +20,7 @@ import play.api.libs.streams.Streams
 import org.reactivestreams.Publisher
 import scala.concurrent.Await
 import play.api.libs.iteratee.Enumerator
+import reactivemongo.bson.BSONObjectID
 
 
 object Database {
@@ -64,6 +65,27 @@ object Database {
 
   def create(post: Post) : Future[LastError] = {
     Database.collection.insert(post)
+  }
+
+  def download(id: String): Future[Publisher[Array[Byte]]] = {
+
+    val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
+
+    val driver = new MongoDriver
+
+    val parsedURI = MongoConnection.parseURI(uri) match {
+      case Success(parsedURI) if parsedURI.db.isDefined =>
+        parsedURI
+    }
+
+    val connection = driver.connection(parsedURI)
+    val db = DB(parsedURI.db.get, connection)
+    val gfs = GridFS(db)
+
+    val query = BSONDocument("_id" -> BSONObjectID(id))
+    gfs.find(query).headOption.map {
+      case Some(file) => Streams.enumeratorToPublisher(gfs.enumerate(file))
+    }
   }
 
   def upload(in: Publisher[Array[Byte]]): Future[ReadFile[BSONValue]] = {

@@ -51,19 +51,6 @@ trait Protocols extends DefaultJsonProtocol {
   implicit val imagePostRequestFormat = jsonFormat2(ImagePostRequest.apply)
 }
 
-trait FileIO {
-
-  val countBytesSink: Sink[Int, Future[Int]] = Sink.fold[Int, Int](0)(_ + _)
-
-}
-
-// trait Marshallers { 
-//   implicit def stringStreamMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[String, Unit]] =
-//     Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { s =>
-//       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
-//     }
-// }
-
 object Boot extends App with Directives with Protocols {
 
   // the actor system to use. Required for flowmaterializer and HTTP.
@@ -121,24 +108,33 @@ object Boot extends App with Directives with Protocols {
           }
         }
       } ~
-      path("upload") {
-        post {
-          entity(as[Multipart.General]) { formData =>
-            complete {
+      path("uploads") {
+        pathEnd {
+          post {
+            entity(as[Multipart.General]) { formData =>
+              complete {
 
-              /* map to the string representation */
-              val content: Source[Array[Byte], Any] =
-                formData.parts.map(_.entity.dataBytes)
-                  .flatten(FlattenStrategy.concat)
-                  .map(_.toArray[Byte])
+                /* map to the string representation */
+                val content: Source[Array[Byte], Any] =
+                  formData.parts.map(_.entity.dataBytes)
+                    .flatten(FlattenStrategy.concat)
+                    .map(_.toArray[Byte])
 
-              val contentPublisher: Publisher[Array[Byte]] =
-                content.runWith(Sink.publisher)
+                val contentPublisher: Publisher[Array[Byte]] =
+                  content.runWith(Sink.publisher)
 
-              Database.upload(contentPublisher)
+                Database.upload(contentPublisher)
+              }
             }
           }
-        }
+        } ~
+          path(Segment) { id =>
+            get {
+              complete {
+                Database.download(id)
+              }
+            }
+          }
       }
   }
 
