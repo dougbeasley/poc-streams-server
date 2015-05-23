@@ -84,7 +84,7 @@ object Database {
 
     val query = BSONDocument("_id" -> BSONObjectID(id))
     gfs.find(query).headOption.map {
-      case Some(file) => Streams.enumeratorToPublisher(gfs.enumerate(file) andThen Enumerator.eof map(ByteString(_)))
+      case Some(file) => Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
     }
   }
 
