@@ -17,16 +17,16 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorFlowMaterializer
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.{Directives, Route}
+import akka.http.scaladsl.server.{ Directives, Route }
 
 import scala.util.Properties
 import scala.util.Success
 
-import java.net.{InetSocketAddress, InetAddress}
+import java.net.{ InetSocketAddress, InetAddress }
 
 import play.api.libs.json._
 
-import akka.event.{LoggingAdapter, Logging}
+import akka.event.{ LoggingAdapter, Logging }
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json.DefaultJsonProtocol
@@ -50,7 +50,6 @@ trait Protocols extends DefaultJsonProtocol {
   implicit val postFormat = jsonFormat3(Post.apply)
   implicit val imagePostRequestFormat = jsonFormat2(ImagePostRequest.apply)
 }
-
 
 trait FileIO {
 
@@ -77,16 +76,15 @@ object Boot extends App with Directives with Protocols {
   // get the environment info.
   val port = Properties.envOrElse("PORT", "8091").toInt
   val localhost = InetAddress.getLocalHost
-  val localIpAddress = localhost.getHostAddress  
+  val localIpAddress = localhost.getHostAddress
   println(s"Starting servce on on $localIpAddress:$port")
 
   /* setup the server */
-  val server:  Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
-                        Http(system).bind(localIpAddress, port)
-
+  val server: Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
+    Http(system).bind(localIpAddress, port)
 
   // helper actor for some logging
-  val idActor = system.actorOf(Props[IDActor],"idActor");
+  val idActor = system.actorOf(Props[IDActor], "idActor");
   //idActor ! "start"
 
   implicit def stringStreamMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[String, Any]] =
@@ -96,17 +94,8 @@ object Boot extends App with Directives with Protocols {
 
   implicit def readFileMArshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Future[ReadFile[BSONValue]]] =
     Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { f =>
-      val resp: String = f.onComplete {
-        case Success(file) =>
-          s"successfully saved file of id ${file.id}"
-        case Failure(e) =>
-          e.printStackTrace()
-          s"exception while saving the file!"
-      }
-      HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, resp))
+      HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, Source(f.map(_.filename).map(ByteString(_)))))
     }
-
-
 
   val postsDirective = pathPrefix("posts") {
     pathEnd {
@@ -115,43 +104,42 @@ object Boot extends App with Directives with Protocols {
           Database.findAllPosts
         }
       } ~
-      (post & entity(as[ImagePostRequest])) { ipr =>
-        complete {
-          val image = Image(ipr.id, ipr.url, ipr.url)
-          val stats = Stats(0,0,0)
-          val post = Post( java.util.UUID.randomUUID.toString, image, stats)
+        (post & entity(as[ImagePostRequest])) { ipr =>
+          complete {
+            val image = Image(ipr.id, ipr.url, ipr.url)
+            val stats = Stats(0, 0, 0)
+            val post = Post(java.util.UUID.randomUUID.toString, image, stats)
 
-          Database.create(post).map( _ => Created -> post)
+            Database.create(post).map(_ => Created -> post)
+          }
         }
-      }
     } ~
-    path(Segment) { id =>
-      get {
-        complete {
-          Database.findById(id)
+      path(Segment) { id =>
+        get {
+          complete {
+            Database.findById(id)
+          }
         }
-      }
-    } ~
-    path("upload") {
-      post {        
-        entity(as[Multipart.General]) { formData =>
-          complete {                  
+      } ~
+      path("upload") {
+        post {
+          entity(as[Multipart.General]) { formData =>
+            complete {
 
-            /* map to the string representation */
-            val content: Source[Array[Byte], Any] =
-              formData.parts.map(_.entity.dataBytes)
-              .flatten(FlattenStrategy.concat)
-              .map(_.toArray[Byte])
+              /* map to the string representation */
+              val content: Source[Array[Byte], Any] =
+                formData.parts.map(_.entity.dataBytes)
+                  .flatten(FlattenStrategy.concat)
+                  .map(_.toArray[Byte])
 
-            val contentPublisher: Publisher[Array[Byte]] =
+              val contentPublisher: Publisher[Array[Byte]] =
                 content.runWith(Sink.publisher)
 
-
-            Database.upload(contentPublisher)
+              Database.upload(contentPublisher)
+            }
           }
         }
       }
-    }
   }
 
   server.to(Sink.foreach { connection =>
@@ -162,7 +150,7 @@ object Boot extends App with Directives with Protocols {
 
 class IDActor extends Actor with ActorLogging {
 
- def receive = {
+  def receive = {
     case "start" =>
       log.info("Current Actors in system:")
       self ! ActorPath.fromString("akka://Streams/user/")

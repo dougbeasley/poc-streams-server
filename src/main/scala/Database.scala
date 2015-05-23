@@ -19,6 +19,7 @@ import reactivemongo.api.gridfs.GridFS
 import play.api.libs.streams.Streams
 import org.reactivestreams.Publisher
 import scala.concurrent.Await
+import play.api.libs.iteratee.Enumerator
 
 
 object Database {
@@ -82,7 +83,7 @@ object Database {
 
     /* setup storage */
     val metadata = DefaultFileToSave(filename = "foo.dat")
-    val enumerator = Streams.publisherToEnumerator(in)
+    val enumerator = Streams.publisherToEnumerator(in) andThen Enumerator.eof
 
     gfs.save(enumerator, metadata)
   }
