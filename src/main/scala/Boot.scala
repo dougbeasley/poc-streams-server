@@ -118,25 +118,6 @@ object Boot extends App with Directives with Protocols {
       }
   }
 
-  /*
-  val loggingSink = Sink() { implicit b =>
-    import FlowGraph.Implicits._
-
-    /* do some logging */
-    val sink = Sink.foreach[String](log.info("logging sink..."))
-
-    sink.in
-  }
-
-  val processingSink = Flow() { implicit b =>
-    import FlowGraph.Implicits._
-
-
-
-
-  }
-  */
-
   val uploadDirective = pathPrefix("uploads") {
     pathEnd {
       post {
