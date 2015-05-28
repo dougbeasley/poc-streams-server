@@ -10,6 +10,7 @@ case class Stats(reported : Int, favorites : Int, found : Int)
 case class Post(id: String, image: Image, stats: Stats)
 
 case class ImagePostRequest(id: String, url : String)
+case class UploadResponse(id: String, filename: String, contentType: Option[String], md5: Option[String])
 
 object Marshallers {
 	implicit val imageBSONHandler = Macros.handler[Image]

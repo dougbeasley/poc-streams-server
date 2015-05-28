@@ -49,6 +49,7 @@ trait Protocols extends DefaultJsonProtocol {
   implicit val statsFormat = jsonFormat3(Stats.apply)
   implicit val postFormat = jsonFormat3(Post.apply)
   implicit val imagePostRequestFormat = jsonFormat2(ImagePostRequest.apply)
+  implicit val uploadResponseFormat = jsonFormat4(UploadResponse.apply)
 }
 
 object Boot extends App with Directives with Protocols {
@@ -79,11 +80,12 @@ object Boot extends App with Directives with Protocols {
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
     }
 
-  implicit def readFileMArshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Future[ReadFile[BSONValue]]] =
+    /*
+  implicit def uploadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[ReadFile[BSONValue], Any]] =
     Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { f =>
-      HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, Source(f.map(_.filename).map(ByteString(_)))))
+      HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, f.map(_.filename).map(ByteString(_))))
     }
-
+  */
   implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[Publisher[ByteString], Unit]] =
     Marshaller.opaque { s =>
       HttpResponse(
@@ -138,7 +140,8 @@ object Boot extends App with Directives with Protocols {
             val contentPublisher: Publisher[Array[Byte]] =
               content.runWith(Sink.publisher)
 
-            Database.upload(contentPublisher)
+            val resp = Source(Database.upload(contentPublisher)).map(r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5)).runWith(Sink.head)
+            resp
           }
         }
       }
