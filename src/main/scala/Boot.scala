@@ -118,17 +118,41 @@ object Boot extends App with Directives with Protocols {
       }
   }
 
+  /*
+  val loggingSink = Sink() { implicit b =>
+    import FlowGraph.Implicits._
+
+    /* do some logging */
+    val sink = Sink.foreach[String](log.info("logging sink..."))
+
+    sink.in
+  }
+
+  val processingSink = Flow() { implicit b =>
+    import FlowGraph.Implicits._
+
+
+
+
+  }
+  */
+
   val uploadDirective = pathPrefix("uploads") {
     pathEnd {
       post {
         entity(as[Multipart.General]) { formData =>
           complete {
 
-            /* map to the string representation */
-            val content: Source[Array[Byte], Any] =
-              formData.parts.map(_.entity.dataBytes)
-                .flatten(FlattenStrategy.concat)
-                .map(_.toArray[Byte])
+            val content: Source[Array[Byte], Any] = formData.parts
+                .filter { part => part.headers.map {
+                  case `Content-Disposition`(_,params) => params.exists( _ == "name" -> "metadata" )
+                  case _ => false
+                  }.contains(true)
+                }
+                .map { elem => log.info(elem.toString()); elem }
+                .map(_.entity.dataBytes)          // map to Source[Source[ByteString]]
+                .flatten(FlattenStrategy.concat)  // flatten to Source[ByteString]
+                .map(_.toArray[Byte])             // map to Array[Byte]
 
             val contentPublisher: Publisher[Array[Byte]] =
               content.runWith(Sink.publisher)
