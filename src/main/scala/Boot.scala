@@ -132,7 +132,7 @@ object Boot extends App with Directives with Protocols {
                   case _ => false
                   }.contains(true)
                 }
-                .map { elem => log.info(elem.toString()); elem }
+                .map { elem => log.info(elem.toString()); elem }  //Debug logging
                 .map(_.entity.dataBytes)          // map to Source[Source[ByteString]]
                 .flatten(FlattenStrategy.concat)  // flatten to Source[ByteString]
                 .map(_.toArray[Byte])             // map to Array[Byte]
@@ -140,7 +140,10 @@ object Boot extends App with Directives with Protocols {
             val contentPublisher: Publisher[Array[Byte]] =
               content.runWith(Sink.publisher)
 
-            val resp = Source(Database.upload(contentPublisher)).map(r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5)).runWith(Sink.head)
+            val resp = Source(Database.upload(contentPublisher)).map(
+              r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5)
+            ).runWith(Sink.head)
+            
             resp
           }
         }
