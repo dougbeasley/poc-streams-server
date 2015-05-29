@@ -121,7 +121,7 @@ object Boot extends App with Directives with Protocols {
       }
   }
 
-  val buildFlow = Flow() { implicit b =>
+  val uploadRequestFlow = Flow() { implicit b =>
     import FlowGraph.Implicits._
 
     val broadcast = b.add(Broadcast[Multipart.General.BodyPart](3))
@@ -155,21 +155,20 @@ object Boot extends App with Directives with Protocols {
         entity(as[Multipart.General]) { formData =>
           complete {
 
-            val content: Source[Array[Byte], Any] = formData.parts
+            val content: Source[Multipart.General.BodyPart, Any] = formData.parts
                 .filter { part => part.headers.map {
                   case `Content-Disposition`(_,params) => params.exists( _ == "name" -> "metadata" )
                   case _ => false
                   }.contains(true)
                 }
                 .map { elem => log.info(elem.toString()); elem }  //Debug logging
-                .map(_.entity.dataBytes)          // map to Source[Source[ByteString]]
-                .flatten(FlattenStrategy.concat)  // flatten to Source[ByteString]
-                .map(_.toArray[Byte])             // map to Array[Byte]
+            
+            val ur = (content via uploadRequestFlow).runWith(Sink.head)
+            
+//            val contentPublisher: Publisher[UploadRequest] =
+//              ur.runWith(Sink.publisher)
 
-            val contentPublisher: Publisher[Array[Byte]] =
-              content.runWith(Sink.publisher)
-
-            val resp: Future[UploadResponse] = Source(Database.upload(contentPublisher)).map(
+            val resp: Future[UploadResponse] = Source(Database.upload(ur)).map(
               r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5)
             ).runWith(Sink.head)
             
