@@ -2,7 +2,8 @@
 import reactivemongo.bson.BSONDocumentReader
 import reactivemongo.bson.BSONObjectID
 import reactivemongo.bson.Macros
-
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import play.api.libs.json._
 
 case class Image(id : String, url : String, cdn : String)
@@ -11,7 +12,7 @@ case class Post(id: String, image: Image, stats: Stats)
 
 case class ImagePostRequest(id: String, url : String)
 case class UploadResponse(id: String, filename: String, contentType: Option[String], md5: Option[String])
-case class UploadRequest(data: Array[Byte], filename: Option[String], contentType: akka.http.scaladsl.model.ContentType)
+case class UploadRequest(data: Source[ByteString, Any], filename: Option[String], contentType: akka.http.scaladsl.model.ContentType)
 
 
 object Marshallers {

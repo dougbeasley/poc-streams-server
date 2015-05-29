@@ -88,7 +88,7 @@ object Database {
     }
   }
 
-  def upload(in: Publisher[UploadRequest]): Future[ReadFile[BSONValue]] = {
+  def upload(uploadRequest: UploadRequest): Future[ReadFile[BSONValue]] = {
     
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
@@ -104,8 +104,8 @@ object Database {
     val gfs = GridFS(db)
 
     /* setup storage */
-    val metadata = DefaultFileToSave(filename = "foo.dat")
-    val enumerator = Streams.publisherToEnumerator(in.map(_.data)) andThen Enumerator.eof
+    val metadata = DefaultFileToSave(uploadRequest.filename orNull, Some(uploadRequest.contentType.toString()))
+    val enumerator = Streams.publisherToEnumerator(uploadRequest.data.runWith(Sink.publisher)) andThen Enumerator.eof
 
     gfs.save(enumerator, metadata)
   }

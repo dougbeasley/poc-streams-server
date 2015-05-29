@@ -7,7 +7,6 @@ import akka.http.scaladsl.model.headers._
 import scala.concurrent.ExecutionContext
 
 import akka.stream.scaladsl._
-import akka.stream.scaladsl.Flow
 import akka.stream.{ActorFlowMaterializer, UniformFanOutShape}
 import play.modules.reactivemongo.json.BSONFormats
 import reactivemongo.bson.BSONDocument
@@ -126,9 +125,10 @@ object Boot extends App with Directives with Protocols {
 
     val broadcast = b.add(Broadcast[Multipart.General.BodyPart](3))
 
-    val f1 = b.add(Flow[Multipart.General.BodyPart].map(_.entity.dataBytes)          // map to Source[Source[ByteString]]
-                    .flatten(FlattenStrategy.concat)  // flatten to Source[ByteString]
-                    .map(_.toArray[Byte]))             // map to Array[Byte]
+    val f1 = b.add(Flow[Multipart.General.BodyPart]
+              .map(_.entity.dataBytes))
+              //.flatten(FlattenStrategy.concat))  // flatten to Source[ByteString]
+              //.map(_.toArray[Byte]))             // map to Array[Byte]
 
 
     /* get the filename */
@@ -140,13 +140,17 @@ object Boot extends App with Directives with Protocols {
     /* get the content type */
     val f3 = b.add(Flow[Multipart.General.BodyPart].map(_.entity.contentType))
 
-    val zip = b.add(ZipWith[Array[Byte], Option[String], ContentType, UploadRequest]({ case (d, f, c) => UploadRequest(d, f, c) }))
+    val f4 = b.add(Flow[UploadRequest].map(Database.upload(_).map(r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5))))
+
+    val zip = b.add(ZipWith[Source[ByteString, Any], Option[String], ContentType, UploadRequest]({ case (d, f, c) => UploadRequest(d, f, c) }))
 
     broadcast.out(0) ~> f1 ~> zip.in0
     broadcast.out(1) ~> f2 ~> zip.in1
     broadcast.out(2) ~> f3 ~> zip.in2
 
-    (broadcast.in, zip.out)
+    zip.out ~> f4
+
+    (broadcast.in, f4.outlet)
   }
 
   val uploadDirective = pathPrefix("uploads") {
@@ -163,14 +167,14 @@ object Boot extends App with Directives with Protocols {
                 }
                 .map { elem => log.info(elem.toString()); elem }  //Debug logging
             
-            val ur = (content via uploadRequestFlow).runWith(Sink.head)
+            val resp = (content via uploadRequestFlow).runWith(Sink.head)
             
 //            val contentPublisher: Publisher[UploadRequest] =
 //              ur.runWith(Sink.publisher)
 
-            val resp: Future[UploadResponse] = Source(Database.upload(ur)).map(
-              r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5)
-            ).runWith(Sink.head)
+            // val resp: Future[UploadResponse] = Source(Database.upload(ur)).map(
+            //   r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5)
+            // ).runWith(Sink.head)
             
             resp
           }
