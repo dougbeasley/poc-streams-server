@@ -38,6 +38,8 @@ import org.reactivestreams.Publisher
 import reactivemongo.api.gridfs.ReadFile
 import reactivemongo.bson.BSONValue
 import scala.util.{ Failure, Success }
+import play.api.libs.iteratee.Enumerator
+
 
 /**
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
@@ -126,10 +128,10 @@ object Boot extends App with Directives with Protocols {
     val broadcast = b.add(Broadcast[Multipart.General.BodyPart](3))
 
     val f1 = b.add(Flow[Multipart.General.BodyPart]
-              .map(_.entity.dataBytes))
-              //.flatten(FlattenStrategy.concat))  // flatten to Source[ByteString]
-              //.map(_.toArray[Byte]))             // map to Array[Byte]
-
+              .map(_.entity.dataBytes)
+              .flatten(FlattenStrategy.concat)  // flatten to Source[ByteString]
+              .map(_.toArray[Byte])             // map to Array[Byte]
+              .map(Enumerator(_)))
 
     /* get the filename */
     val f2 = b.add(Flow[Multipart.General.BodyPart].mapConcat(_.headers).map {
@@ -142,7 +144,7 @@ object Boot extends App with Directives with Protocols {
 
     val f4 = b.add(Flow[UploadRequest].map(Database.upload(_).map(r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5))))
 
-    val zip = b.add(ZipWith[Source[ByteString, Any], Option[String], ContentType, UploadRequest]({ case (d, f, c) => UploadRequest(d, f, c) }))
+    val zip = b.add(ZipWith[Enumerator[Array[Byte]], Option[String], ContentType, UploadRequest]({ case (d, f, c) => UploadRequest(d, f, c) }))
 
     broadcast.out(0) ~> f1 ~> zip.in0
     broadcast.out(1) ~> f2 ~> zip.in1

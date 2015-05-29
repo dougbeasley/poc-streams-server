@@ -105,7 +105,7 @@ object Database {
 
     /* setup storage */
     val metadata = DefaultFileToSave(uploadRequest.filename orNull, Some(uploadRequest.contentType.toString()))
-    val enumerator = Streams.publisherToEnumerator(uploadRequest.data.runWith(Sink.publisher)) andThen Enumerator.eof
+    val enumerator = uploadRequest.data andThen Enumerator.eof
 
     gfs.save(enumerator, metadata)
   }
