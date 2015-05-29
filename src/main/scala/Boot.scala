@@ -170,14 +170,6 @@ object Boot extends App with Directives with Protocols {
                 .map { elem => log.info(elem.toString()); elem }  //Debug logging
             
             val resp = (content via uploadRequestFlow).runWith(Sink.head)
-            
-//            val contentPublisher: Publisher[UploadRequest] =
-//              ur.runWith(Sink.publisher)
-
-            // val resp: Future[UploadResponse] = Source(Database.upload(ur)).map(
-            //   r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5)
-            // ).runWith(Sink.head)
-            
             resp
           }
         }
