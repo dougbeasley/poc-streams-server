@@ -82,18 +82,11 @@ object Boot extends App with Directives with Protocols {
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
     }
 
-    /*
-  implicit def uploadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[ReadFile[BSONValue], Any]] =
-    Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { f =>
-      HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, f.map(_.filename).map(ByteString(_))))
-    }
-  */
-  implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[Publisher[ByteString], Unit]] =
-    Marshaller.opaque { s =>
+  implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[DownloadRequest] =
+    Marshaller.opaque { dr =>
       HttpResponse(
-        entity = HttpEntity.CloseDelimited(MediaTypes.`image/jpeg`,
-            s.map(Source(_))
-            .flatten(FlattenStrategy.concat)))
+        entity = HttpEntity.CloseDelimited(dr.contentType, dr.data)
+      )
     }
 
   val postsDirective = pathPrefix("posts") {
@@ -177,11 +170,15 @@ object Boot extends App with Directives with Protocols {
     } ~ path(Segment) { id =>
       get {
         complete {
-          Source(Database.download(id))
+            Database.download(id)
         }
       }
     }
   }
+
+
+
+//Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
 
   val directives: Route = postsDirective ~ uploadDirective
   
