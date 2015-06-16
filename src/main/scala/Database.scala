@@ -67,7 +67,7 @@ object Database {
     Database.collection.insert(post)
   }
 
-  def download(id: String): Future[Publisher[ByteString]] = {
+  def download(id: String): Future[ReadFile[BSONValue]] = {
 
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
@@ -84,8 +84,25 @@ object Database {
 
     val query = BSONDocument("_id" -> BSONObjectID(id))
     gfs.find(query).headOption.map {
-      case Some(file) => Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
+      case Some(_file) => _file //Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
     }
+  }
+
+  def stream(file: ReadFile[BSONValue]): Publisher[ByteString] = {
+    val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
+
+    val driver = new MongoDriver
+
+    val parsedURI = MongoConnection.parseURI(uri) match {
+      case Success(parsedURI) if parsedURI.db.isDefined =>
+        parsedURI
+    }
+
+    val connection = driver.connection(parsedURI)
+    val db = DB(parsedURI.db.get, connection)
+    val gfs = GridFS(db)
+
+    Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
   }
 
   def upload(in: Publisher[Array[Byte]]): Future[ReadFile[BSONValue]] = {

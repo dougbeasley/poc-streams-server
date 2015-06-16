@@ -84,11 +84,11 @@ object Boot extends App with Directives with Protocols {
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, Source(f.map(_.filename).map(ByteString(_)))))
     }
 
-  implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[Publisher[ByteString], Unit]] =
+  implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[ReadFile[BSONValue], Unit]] =
     Marshaller.opaque { s =>
       HttpResponse(
         entity = HttpEntity.CloseDelimited(MediaTypes.`image/jpeg`,
-            s.map(Source(_))
+            s.map(Database.stream(_)).map(Source(_))
             .flatten(FlattenStrategy.concat)))
     }
 
