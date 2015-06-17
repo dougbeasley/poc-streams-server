@@ -163,7 +163,7 @@ object Boot extends App with Directives with Protocols {
 
             val content: Source[Multipart.General.BodyPart, Any] = formData.parts
                 .filter { part => part.headers.map {
-                  case `Content-Disposition`(_,params) => params.exists( _ == "name" -> "metadata" )
+                  case `Content-Disposition`(_,params) => params.exists( _ == "name" -> "content" )
                   case _ => false
                   }.contains(true)
                 }

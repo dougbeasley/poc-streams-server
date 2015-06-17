@@ -21,7 +21,7 @@ import org.reactivestreams.Publisher
 import scala.concurrent.Await
 import play.api.libs.iteratee.Enumerator
 import reactivemongo.bson.BSONObjectID
-import akka.http.scaladsl.model.{ ContentType, MediaType }
+import akka.http.scaladsl.model.{ ContentType, MediaType, MediaTypes }
 
 
 object Database {
@@ -86,14 +86,21 @@ object Database {
 
     val query = BSONDocument("_id" -> BSONObjectID(id))
     gfs.find(query).headOption.map {
-      case Some(file) => (file.contentType, Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof) )
+      case Some(file) => (file.contentType, file)       
     }.map {
-      case (Some(ct), data) => DownloadRequest(Source(data), MediaType ~ ct)
+      case (Some(ct), file) =>
+       DownloadRequest(toContentType(ct), Source(stream(file)))
     }
-
   }
-/*
-  def stream(file: ReadFile[BSONValue]): Publisher[ByteString] = {
+
+  private def toContentType(s: String) : ContentType = {
+    val mediaType = s.split("/") match {
+      case Array(mainType, subType) => MediaTypes.getForKey(mainType -> subType)
+    }
+    ContentType(mediaType.getOrElse(MediaTypes.`application/octet-stream`))
+  }
+
+  private def stream(file: ReadFile[BSONValue]): Publisher[ByteString] = {
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
     val driver = new MongoDriver
@@ -109,7 +116,7 @@ object Database {
 
     Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
   }
-*/
+
 
   def upload(uploadRequest: UploadRequest): Future[ReadFile[BSONValue]] = {
     
