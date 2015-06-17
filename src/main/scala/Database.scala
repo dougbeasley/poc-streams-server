@@ -21,6 +21,7 @@ import org.reactivestreams.Publisher
 import scala.concurrent.Await
 import play.api.libs.iteratee.Enumerator
 import reactivemongo.bson.BSONObjectID
+import akka.http.scaladsl.model.{ ContentType, MediaType }
 
 
 object Database {
@@ -67,7 +68,8 @@ object Database {
     Database.collection.insert(post)
   }
 
-  def download(id: String): Future[ReadFile[BSONValue]] = {
+
+  def download(id: String) = {
 
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
@@ -84,10 +86,13 @@ object Database {
 
     val query = BSONDocument("_id" -> BSONObjectID(id))
     gfs.find(query).headOption.map {
-      case Some(_file) => _file //Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
+      case Some(file) => (file.contentType, Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof) )
+    }.map {
+      case (Some(ct), data) => DownloadRequest(Source(data), MediaType ~ ct)
     }
-  }
 
+  }
+/*
   def stream(file: ReadFile[BSONValue]): Publisher[ByteString] = {
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
@@ -104,8 +109,9 @@ object Database {
 
     Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
   }
+*/
 
-  def upload(in: Publisher[Array[Byte]]): Future[ReadFile[BSONValue]] = {
+  def upload(uploadRequest: UploadRequest): Future[ReadFile[BSONValue]] = {
     
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
@@ -121,8 +127,8 @@ object Database {
     val gfs = GridFS(db)
 
     /* setup storage */
-    val metadata = DefaultFileToSave(filename = "foo.dat")
-    val enumerator = Streams.publisherToEnumerator(in) andThen Enumerator.eof
+    val metadata = DefaultFileToSave(uploadRequest.filename orNull, Some(uploadRequest.contentType.toString()))
+    val enumerator = uploadRequest.data andThen Enumerator.eof
 
     gfs.save(enumerator, metadata)
   }
