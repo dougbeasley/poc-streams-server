@@ -7,14 +7,13 @@ import akka.http.scaladsl.model.headers._
 import scala.concurrent.ExecutionContext
 
 import akka.stream.scaladsl._
-import akka.stream.{ActorFlowMaterializer, UniformFanOutShape}
+import akka.stream.{ ActorFlowMaterializer, UniformFanOutShape }
 import play.modules.reactivemongo.json.BSONFormats
 import reactivemongo.bson.BSONDocument
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json._
 import akka.http.scaladsl.Http
-
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{ Directives, Route }
@@ -39,7 +38,6 @@ import reactivemongo.api.gridfs.ReadFile
 import reactivemongo.bson.BSONValue
 import scala.util.{ Failure, Success }
 import play.api.libs.iteratee.Enumerator
-
 
 /**
  * Simple Object that starts an HTTP server using akka-http. All requests are handled
@@ -82,7 +80,7 @@ object Boot extends App with Directives with Protocols {
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
     }
 
-/*
+  /*
   implicit def readFileMArshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Future[ReadFile[BSONValue]]] =
     Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { f =>
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, Source(f.map(_.filename).map(ByteString(_)))))
@@ -92,8 +90,7 @@ object Boot extends App with Directives with Protocols {
   implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[DownloadRequest] =
     Marshaller.opaque { dr =>
       HttpResponse(
-        entity = HttpEntity.CloseDelimited(dr.contentType, dr.data)
-      )
+        entity = HttpEntity.CloseDelimited(dr.contentType, dr.data))
     }
 
   val postsDirective = pathPrefix("posts") {
@@ -128,23 +125,25 @@ object Boot extends App with Directives with Protocols {
     val broadcast = b.add(Broadcast[Multipart.General.BodyPart](3))
 
     val f1 = b.add(Flow[Multipart.General.BodyPart]
-              .map(_.entity.dataBytes)
-              .flatten(FlattenStrategy.concat)  // flatten to Source[ByteString]
-              .map(_.toArray[Byte])             // map to Array[Byte]
-              .map(Enumerator(_)))
+      .map(_.entity.dataBytes.map(_.toArray))
+      .map(_.runWith(Sink.publisher)))
 
     /* get the filename */
     val f2 = b.add(Flow[Multipart.General.BodyPart].mapConcat(_.headers).map {
-      case `Content-Disposition`(_,params) => params get "filename"
+      case `Content-Disposition`(_, params) => params get "filename"
       case _ => None
     })
 
     /* get the content type */
     val f3 = b.add(Flow[Multipart.General.BodyPart].map(_.entity.contentType))
 
-    val f4 = b.add(Flow[UploadRequest].map(Database.upload(_).map(r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5))))
+    val zip = b.add(ZipWith[Publisher[Array[Byte]], Option[String], ContentType, UploadRequest](
+      { case (d, f, c) => UploadRequest(d, f, c) }))
 
-    val zip = b.add(ZipWith[Enumerator[Array[Byte]], Option[String], ContentType, UploadRequest]({ case (d, f, c) => UploadRequest(d, f, c) }))
+    val f4 = b.add(
+      Flow[UploadRequest].map(
+        Database.upload(_)
+          .map(r => UploadResponse(r.id.toString(), r.filename, r.contentType, r.md5))))
 
     broadcast.out(0) ~> f1 ~> zip.in0
     broadcast.out(1) ~> f2 ~> zip.in1
@@ -162,13 +161,14 @@ object Boot extends App with Directives with Protocols {
           complete {
 
             val content: Source[Multipart.General.BodyPart, Any] = formData.parts
-                .filter { part => part.headers.map {
-                  case `Content-Disposition`(_,params) => params.exists( _ == "name" -> "content" )
+              .filter { part =>
+                part.headers.map {
+                  case `Content-Disposition`(_, params) => params.exists(_ == "name" -> "content")
                   case _ => false
-                  }.contains(true)
-                }
-                .map { elem => log.info(elem.toString()); elem }  //Debug logging
-            
+                }.contains(true)
+              }
+              .map { elem => log.info(elem.toString()); elem } //Debug logging
+
             val resp = (content via uploadRequestFlow).runWith(Sink.head)
             resp
           }
@@ -177,18 +177,16 @@ object Boot extends App with Directives with Protocols {
     } ~ path(Segment) { id =>
       get {
         complete {
-            Database.download(id)
+          Database.download(id)
         }
       }
     }
   }
 
-
-
-//Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
+  //Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
 
   val directives: Route = postsDirective ~ uploadDirective
-  
+
   server.to(Sink.foreach { connection =>
     connection.handleWith(Flow[HttpRequest].mapAsync(4)(Route.asyncHandler(directives))) //Had to add parallelism here
     idActor ! "start"

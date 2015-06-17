@@ -29,9 +29,11 @@ object Database {
   import Marshallers._
   import reactivemongo.api.gridfs.Implicits._
 
-  def collection: BSONCollection = connect()
+  def db: DefaultDB = connect()
 
-  def connect(): BSONCollection = {
+  val gfs = new GridFS(db)
+  
+  def connect(): DefaultDB = {
 
     val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
@@ -43,15 +45,13 @@ object Database {
     }
 
     val connection = driver.connection(parsedURI)
-    val db = DB(parsedURI.db.get, connection)
-    db.collection("posts")
+    DefaultDB(parsedURI.db.get, connection)
   }
 
   def findAllPosts(): Future[List[Post]] = {
     val query = BSONDocument()
 
-    Database.collection
-      .find(query)
+    db[BSONCollection]("posts").find(query)
       .cursor[Post]
       .collect[List]()
   }
@@ -59,30 +59,17 @@ object Database {
   def findById(id: String) : Future[Option[Post]] = {
     val query = BSONDocument("id" -> id)
 
-    Database.collection
-      .find(query)
-      .one[Post]
+    db[BSONCollection]("posts").find(query).one[Post]
   }
 
   def create(post: Post) : Future[LastError] = {
-    Database.collection.insert(post)
+   db[BSONCollection]("posts").insert(post)
   }
 
 
   def download(id: String) = {
 
-    val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
-
-    val driver = new MongoDriver
-
-    val parsedURI = MongoConnection.parseURI(uri) match {
-      case Success(parsedURI) if parsedURI.db.isDefined =>
-        parsedURI
-    }
-
-    val connection = driver.connection(parsedURI)
-    val db = DB(parsedURI.db.get, connection)
-    val gfs = GridFS(db)
+    //val gfs = GridFS(db)
 
     val query = BSONDocument("_id" -> BSONObjectID(id))
     gfs.find(query).headOption.map {
@@ -101,41 +88,21 @@ object Database {
   }
 
   private def stream(file: ReadFile[BSONValue]): Publisher[ByteString] = {
-    val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
-    val driver = new MongoDriver
-
-    val parsedURI = MongoConnection.parseURI(uri) match {
-      case Success(parsedURI) if parsedURI.db.isDefined =>
-        parsedURI
-    }
-
-    val connection = driver.connection(parsedURI)
-    val db = DB(parsedURI.db.get, connection)
-    val gfs = GridFS(db)
+    //val gfs = GridFS(db)
 
     Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
   }
 
 
   def upload(uploadRequest: UploadRequest): Future[ReadFile[BSONValue]] = {
-    
-    val uri = Properties.envOrElse("MONGOLAB_URI", "mongodb://localhost/akka")
 
-    val driver = new MongoDriver
-
-    val parsedURI = MongoConnection.parseURI(uri) match {
-      case Success(parsedURI) if parsedURI.db.isDefined =>
-        parsedURI
-    }
-
-    val connection = driver.connection(parsedURI)
-    val db = DB(parsedURI.db.get, connection)
-    val gfs = GridFS(db)
+    //val gfs = GridFS(db)
 
     /* setup storage */
     val metadata = DefaultFileToSave(uploadRequest.filename orNull, Some(uploadRequest.contentType.toString()))
-    val enumerator = uploadRequest.data andThen Enumerator.eof
+    //val publisher = uploadRequest.data.runWith(Sink.publisher)
+    val enumerator = Streams.publisherToEnumerator(uploadRequest.data) andThen Enumerator.eof
 
     gfs.save(enumerator, metadata)
   }
