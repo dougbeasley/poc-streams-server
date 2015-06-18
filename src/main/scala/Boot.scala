@@ -80,13 +80,6 @@ object Boot extends App with Directives with Protocols {
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
     }
 
-  /*
-  implicit def readFileMArshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Future[ReadFile[BSONValue]]] =
-    Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { f =>
-      HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, Source(f.map(_.filename).map(ByteString(_)))))
-    }
-*/
-
   implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[DownloadRequest] =
     Marshaller.opaque { dr =>
       HttpResponse(
@@ -182,8 +175,6 @@ object Boot extends App with Directives with Protocols {
       }
     }
   }
-
-  //Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
 
   val directives: Route = postsDirective ~ uploadDirective
 

@@ -88,17 +88,11 @@ object Database {
   }
 
   private def stream(file: ReadFile[BSONValue]): Publisher[ByteString] = {
-
-    //val gfs = GridFS(db)
-
     Streams.enumeratorToPublisher(gfs.enumerate(file).map(ByteString(_)) andThen Enumerator.eof)
   }
 
 
   def upload(uploadRequest: UploadRequest): Future[ReadFile[BSONValue]] = {
-
-    //val gfs = GridFS(db)
-
     /* setup storage */
     val metadata = DefaultFileToSave(uploadRequest.filename orNull, Some(uploadRequest.contentType.toString()))
     //val publisher = uploadRequest.data.runWith(Sink.publisher)
