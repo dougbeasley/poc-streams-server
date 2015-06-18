@@ -39,11 +39,6 @@ import reactivemongo.bson.BSONValue
 import scala.util.{ Failure, Success }
 import play.api.libs.iteratee.Enumerator
 
-/**
- * Simple Object that starts an HTTP server using akka-http. All requests are handled
- * through an Akka flow.
- */
-
 trait Protocols extends DefaultJsonProtocol {
   implicit val imageFormat = jsonFormat3(Image.apply)
   implicit val statsFormat = jsonFormat3(Stats.apply)
@@ -52,16 +47,21 @@ trait Protocols extends DefaultJsonProtocol {
   implicit val uploadResponseFormat = jsonFormat4(UploadResponse.apply)
 }
 
+/**
+ * Simple Object that starts an HTTP server using akka-http. All requests are handled
+ * through an Akka flow.
+ */
+
 object Boot extends App with Directives with Protocols {
 
-  // the actor system to use. Required for flowmaterializer and HTTP.
-  // passed in implicit
+  /** the actor system to use. Required for flowmaterializer and HTTP.
+   * passed in implicit */
   implicit val system = ActorSystem("Streams")
   implicit val materializer = ActorFlowMaterializer()
 
   val log = Logging(system, getClass)
 
-  // get the environment info.
+  /* get the environment info. */
   val port = Properties.envOrElse("PORT", "8091").toInt
   val localhost = InetAddress.getLocalHost
   val localIpAddress = localhost.getHostAddress
@@ -71,21 +71,24 @@ object Boot extends App with Directives with Protocols {
   val server: Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
     Http(system).bind(localIpAddress, port)
 
-  // helper actor for some logging
+  /* helper actor for some logging */
   val idActor = system.actorOf(Props[IDActor], "idActor");
   //idActor ! "start"
 
+  /* marshall string data */
   implicit def stringStreamMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[Source[String, Any]] =
     Marshaller.withFixedCharset(MediaTypes.`text/plain`, HttpCharsets.`UTF-8`) { s =>
       HttpResponse(entity = HttpEntity.CloseDelimited(MediaTypes.`text/plain`, s.map(ByteString(_))))
     }
 
+  /* send data to the client */
   implicit def downloadMarshaller(implicit ec: ExecutionContext): ToResponseMarshaller[DownloadRequest] =
     Marshaller.opaque { dr =>
       HttpResponse(
         entity = HttpEntity.CloseDelimited(dr.contentType, dr.data))
     }
 
+  /* directives for general post create and read operations */
   val postsDirective = pathPrefix("posts") {
     pathEnd {
       get {
@@ -117,6 +120,7 @@ object Boot extends App with Directives with Protocols {
 
     val broadcast = b.add(Broadcast[Multipart.General.BodyPart](3))
 
+    /* convert the data bytes to a publisher */
     val f1 = b.add(Flow[Multipart.General.BodyPart]
       .map(_.entity.dataBytes.map(_.toArray))
       .map(_.runWith(Sink.publisher)))
@@ -130,9 +134,11 @@ object Boot extends App with Directives with Protocols {
     /* get the content type */
     val f3 = b.add(Flow[Multipart.General.BodyPart].map(_.entity.contentType))
 
+    /* package into an UploadRequest */
     val zip = b.add(ZipWith[Publisher[Array[Byte]], Option[String], ContentType, UploadRequest](
       { case (d, f, c) => UploadRequest(d, f, c) }))
 
+    /* upload the data to mongo and map to a response */
     val f4 = b.add(
       Flow[UploadRequest].map(
         Database.upload(_)
@@ -147,6 +153,7 @@ object Boot extends App with Directives with Protocols {
     (broadcast.in, f4.outlet)
   }
 
+  /* file upload/download directives */
   val uploadDirective = pathPrefix("uploads") {
     pathEnd {
       post {
@@ -176,8 +183,10 @@ object Boot extends App with Directives with Protocols {
     }
   }
 
+  /* combine the directives into the master route */
   val directives: Route = postsDirective ~ uploadDirective
 
+  /* materialize the server */
   server.to(Sink.foreach { connection =>
     connection.handleWith(Flow[HttpRequest].mapAsync(4)(Route.asyncHandler(directives))) //Had to add parallelism here
     idActor ! "start"
