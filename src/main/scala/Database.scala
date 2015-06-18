@@ -66,10 +66,7 @@ object Database {
    db[BSONCollection]("posts").insert(post)
   }
 
-
   def download(id: String) = {
-
-    //val gfs = GridFS(db)
 
     val query = BSONDocument("_id" -> BSONObjectID(id))
     gfs.find(query).headOption.map {
@@ -95,7 +92,6 @@ object Database {
   def upload(uploadRequest: UploadRequest): Future[ReadFile[BSONValue]] = {
     /* setup storage */
     val metadata = DefaultFileToSave(uploadRequest.filename orNull, Some(uploadRequest.contentType.toString()))
-    //val publisher = uploadRequest.data.runWith(Sink.publisher)
     val enumerator = Streams.publisherToEnumerator(uploadRequest.data) andThen Enumerator.eof
 
     gfs.save(enumerator, metadata)
