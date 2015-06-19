@@ -9,6 +9,8 @@ import play.api.libs.iteratee.Enumerator
 import akka.http.scaladsl.model._
 import org.reactivestreams.Publisher
 
+case class Coordinate(lat: Float, lon: Float, alt: Float)
+case class Location(type: String, coordinates: Seq[Coordinate])
 case class Image(id : String, url : String, cdn : String)
 case class Stats(reported : Int, favorites : Int, found : Int)
 case class Post(id: String, image: Image, stats: Stats)
