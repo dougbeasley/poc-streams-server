@@ -6,6 +6,7 @@
 *.tm.epoch
 *.vim
 *-shim.sbt
+*.sc
 .idea/
 /project/plugins/project
 project/boot
@@ -15,3 +16,4 @@ target/
 .classpath
 .project
 .settings
+.worksheet
