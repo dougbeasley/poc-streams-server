@@ -160,14 +160,15 @@ object Boot extends App with Directives with Protocols {
         entity(as[Multipart.General]) { formData =>
           complete {
 
-            val content: Source[Multipart.General.BodyPart, Any] = formData.parts
-              .filter { part =>
-                part.headers.map {
-                  case `Content-Disposition`(_, params) => params.exists(_ == "name" -> "content")
+            val content: Source[Multipart.General.BodyPart, Any] = formData.parts.filter {
+              case Multipart.General.BodyPart(_, headers) =>
+                headers exists {
+                  case `Content-Disposition`(_, params) => 
+                    params.exists(_ == "name" -> "content")
                   case _ => false
-                }.contains(true)
-              }
-              .map { elem => log.info(elem.toString()); elem } //Debug logging
+                }
+              case _ => false
+            }.map { elem => log.info(elem.toString()); elem } //Debug logging
 
             val resp = (content via uploadRequestFlow).runWith(Sink.head)
             resp
