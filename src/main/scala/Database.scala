@@ -9,7 +9,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Properties
 import scala.util.{Try,Success,Failure}
-import java.util.stream.Streams
 import reactivemongo.bson.BSONValue
 import reactivemongo.api.gridfs.DefaultFileToSave
 import play.api.libs.iteratee.Iteratee
