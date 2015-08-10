@@ -170,7 +170,7 @@ object Boot extends App with Directives with Protocols {
         entity(as[Multipart.General]) { formData =>
           complete {
             val content = formData.parts filter filterByName("content")
-            val meta = formData.parts filter filterByName("meta")
+            val meta = formData.parts filter filterByName("metadata")
             val resp = (content via uploadRequestFlow).runWith(Sink.head)
             resp
           }
